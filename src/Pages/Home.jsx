@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { User } from "../entities/User";
-import { Outfit } from "../entities/Outfit"; 
+import { Outfit } from "../entities/Outfit";
 import { SavedOutfit } from "../entities/SavedOutfit";
 import { InvokeLLM, GenerateImage } from "../integrations/Core";
+import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "../utils";
 import { RefreshCw, Sparkles, LogIn } from "lucide-react";
@@ -25,27 +26,7 @@ export default function HomePage() {
   const [showQuiz, setShowQuiz] = useState(false);
   const [showPrefsForm, setShowPrefsForm] = useState(false);
 
-  useEffect(() => {
-    const loadUser = async () => {
-      setLoading(true);
-      try {
-        const currentUser = await User.me();
-        setUser(currentUser);
-        if (!currentUser.style_preferences || currentUser.style_preferences.length === 0) {
-          setShowQuiz(true);
-        } else {
-          // Load saved outfits
-          const saved = await SavedOutfit.filter({ user_id: currentUser.id });
-          setSavedOutfits(saved);
-        }
-      } catch (error) {
-        // Not logged in
-        setUser(null);
-      }
-      setLoading(false);
-    };
-    loadUser();
-  }, []);
+
 
   const generateTodaysOutfit = async (dailyPrefs) => {
     if (!user || !weather || !dailyPrefs) return;
@@ -175,9 +156,46 @@ export default function HomePage() {
     }
   };
   
-  const handleLogin = async () => {
-      await User.login();
+const handleLogin = async () => {
+  try {
+    await User.login();
+  } catch (error) {
+    console.error('Login error:', error.message);
+  }
+};
+
+useEffect(() => {
+  const loadUser = async () => {
+    setLoading(true);
+    try {
+      const currentUser = await User.me();
+      setUser(currentUser);
+      if (!currentUser || !currentUser.style_preferences || currentUser.style_preferences.length === 0) {
+        setShowQuiz(true);
+      } else {
+        const saved = await SavedOutfit.filter({ user_id: currentUser.id });
+        setSavedOutfits(saved);
+      }
+    } catch (error) {
+      setUser(null);
+    }
+    setLoading(false);
   };
+
+  const authListener = supabase.auth.onAuthStateChange(
+    (event, session) => {
+      if (event === 'SIGNED_IN') {
+        loadUser();
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    }
+  );
+
+  loadUser();
+
+  return () => authListener.data.subscription?.unsubscribe();
+}, []);
 
   if (loading) {
     return (
@@ -195,7 +213,7 @@ export default function HomePage() {
           Welcome to Style Weather ❤
         </h1>
         <p className="text-gray-600 mb-6">Log in to get personalized daily outfit ideas based on your local weather.</p>
-        <Button onClick={handleLogin} className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-xl px-8 py-3">
+        <Button onClick={() => navigate('/login')} className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-xl px-8 py-3">
           <LogIn className="w-4 h-4 mr-2" />
           Login or Sign Up
         </Button>

@@ -1,32 +1,52 @@
-// Mock Outfit entity for development
+import { supabase } from "../lib/supabase"
+
 class Outfit {
   static async create(data) {
-    // Mock outfit creation
-    const outfit = {
-      id: Date.now(),
-      ...data,
-      created_at: new Date().toISOString()
-    };
-    console.log("Mock outfit created:", outfit);
-    return outfit;
+    // Maps expected fields to the DB schema in README: public.outfits
+    const payload = {
+      title: data.title ?? "",
+      description: data.description ?? null,
+      pieces: data.pieces ?? [],
+      style_tags: data.style_tags ?? [],
+      why_this_outfit: data.why_this_outfit ?? null,
+      weather_condition: data.weather_condition ?? null,
+      temperature_range: data.temperature_range ?? null,
+      occasion: data.occasion ?? null,
+      image_url: data.image_url ?? null,
+    }
+
+    const { data: inserted, error } = await supabase
+      .from("outfits")
+      .insert([payload])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[Outfit.create]", error)
+      throw error
+    }
+
+    return inserted
   }
 
   static async find(id) {
-    // Mock outfit retrieval
-    return {
-      id: parseInt(id),
-      title: "Sample Outfit",
-      description: "A beautiful outfit for today",
-      pieces: [
-        { category: "Top", item: "Blouse", color: "Pink" },
-        { category: "Bottom", item: "Jeans", color: "Blue" },
-        { category: "Shoes", item: "Sneakers", color: "White" }
-      ],
-      style_tags: ["casual", "comfortable"],
-      why_this_outfit: "Perfect for the weather and your style",
-      image_url: "https://via.placeholder.com/300x400"
-    };
+    const { data: row, error } = await supabase
+      .from("outfits")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      console.error("[Outfit.find]", error)
+      throw error
+    }
+
+    return row
+  }
+
+  static async get(id) {
+    return this.find(id)
   }
 }
 
-export { Outfit };
+export { Outfit }

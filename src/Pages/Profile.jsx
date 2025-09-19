@@ -1,123 +1,61 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { User } from '../entities/User';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
+import { Sparkles, Edit3, LogOut, Settings } from 'lucide-react';
 
-import React, { useState, useEffect } from "react";
-import { User } from "../entities/User";
-import { Button } from "../components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Badge } from "../components/ui/badge";
-import { Settings, Edit3, Sparkles, LogOut, LogIn } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-
-import StyleQuiz from "../components/StyleQuiz";
-
-// Placeholder for createPageUrl - assuming this is a global utility or imported elsewhere.
-// Defined here to ensure the file is self-contained and functional.
-const createPageUrl = (pageName) => {
-  switch (pageName) {
-    case 'Home':
-      return '/';
-    // Add other cases as needed by your application's routing
-    default:
-      return '/';
-  }
-};
-
-export default function ProfilePage() {
-  const navigate = useNavigate();
+export function Profile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
   const [showStyleQuiz, setShowStyleQuiz] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadUser();
   }, []);
 
   const loadUser = async () => {
-    setLoading(true); // Moved setLoading(true) to the start
     try {
-      const currentUser = await User.me();
-      setUser(currentUser);
+      const userData = await User.me();
+      setUser(userData);
     } catch (error) {
-      setUser(null); // Set user to null if not logged in or error occurs
-      console.error("User not logged in:", error);
-    }
-    setLoading(false);
-  };
-
-  const handleUpdateProfile = async (profileData) => {
-    try {
-      await User.updateMyUserData(profileData);
-      const updatedUser = await User.me();
-      setUser(updatedUser);
-      setEditing(false);
-      setShowStyleQuiz(false);
-    } catch (error) {
-      console.error("Error updating profile:", error);
+      console.error("Error loading user:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLogout = async () => {
     try {
       await User.logout();
-      setUser(null); // Clear user state
-      navigate(createPageUrl('Home')); // Redirect to home page
+      navigate('/');
     } catch (error) {
       console.error("Error logging out:", error);
     }
   };
-  
-  const handleLogin = async () => {
-    // Assuming User.login() handles the authentication flow (e.g., redirect to login provider, then back)
-    await User.login();
-    // After login, attempt to reload user data
-    loadUser();
-  };
 
   if (loading) {
     return (
-      <div className="p-4 space-y-4">
-        <div className="h-48 bg-white/50 rounded-2xl animate-pulse"></div>
-        <div className="h-32 bg-white/50 rounded-2xl animate-pulse"></div>
-      </div>
-    );
-  }
-  
-  if (!user) {
-    return (
-      <div className="p-4 text-center pt-20">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-4">
-          Join the Club!
-        </h1>
-        <p className="text-gray-600 mb-6">Log in to manage your profile, saved outfits, and style preferences.</p>
-        <Button onClick={handleLogin} className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-xl px-8 py-3">
-          <LogIn className="w-4 h-4 mr-2" />
-          Login or Sign Up
-        </Button>
-      </div>
-    )
-  }
-
-  if (showStyleQuiz) {
-    return (
-      <div className="p-4 pt-8">
-        <StyleQuiz onComplete={handleUpdateProfile} />
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 max-w-2xl mx-auto">
       {/* Profile Header */}
       <Card className="bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-xl">
         <CardContent className="p-6 text-center">
           <div className="w-20 h-20 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
             <span className="text-2xl font-bold">
-              {user?.full_name?.[0]?.toUpperCase() || '👤'}
+              {user?.name?.[0]?.toUpperCase() || '👤'}
             </span>
           </div>
-          <h2 className="text-xl font-bold mb-1">{user?.full_name || 'Fashion Lover'}</h2>
+          <h2 className="text-xl font-bold mb-1">{user?.name || 'Fashion Lover'}</h2>
           <p className="text-sm opacity-90">{user?.email}</p>
           {user?.age && (
             <p className="text-sm opacity-90 mt-1">
@@ -192,14 +130,6 @@ export default function ProfilePage() {
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Location */}
-      <Card className="bg-white/95 backdrop-blur-sm border-0 shadow-lg">
-        <CardContent className="p-6">
-          <Label className="text-sm font-medium text-gray-600">Location</Label>
-          <p className="text-gray-800 mt-1">📍 {user?.location || 'Not set'}</p>
         </CardContent>
       </Card>
 

@@ -3,7 +3,6 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "./ui/card"
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Sparkles, X } from "lucide-react";
 
 export default function DailyPreferencesForm({ user, onGenerate, onCancel, isGenerating }) {
@@ -28,19 +27,22 @@ export default function DailyPreferencesForm({ user, onGenerate, onCancel, isGen
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="occasion">What's the occasion?</Label>
-              <Select value={occasion} onValueChange={setOccasion}>
-                <SelectTrigger id="occasion">
-                  <SelectValue placeholder="Select an occasion" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="casual">Casual</SelectItem>
-                  <SelectItem value="work">Work</SelectItem>
-                  <SelectItem value="date">Date Night</SelectItem>
-                  <SelectItem value="party">Party</SelectItem>
-                  <SelectItem value="brunch">Brunch</SelectItem>
-                  <SelectItem value="shopping">Shopping</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                id="occasion"
+                value={occasion}
+                onChange={(e) => setOccasion(e.target.value)}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="" disabled>
+                  Select an occasion
+                </option>
+                <option value="casual">Casual</option>
+                <option value="work">Work</option>
+                <option value="date">Date Night</option>
+                <option value="party">Party</option>
+                <option value="brunch">Brunch</option>
+                <option value="shopping">Shopping</option>
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="mood">Any specific vibe or color?</Label>
