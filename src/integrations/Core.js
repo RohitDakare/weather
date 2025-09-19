@@ -1,8 +1,14 @@
+// import Gemini AI client
 import { GoogleGenerativeAI } from "@google/generative-ai"
+// import OpenAI client
+import OpenAI from "openai"
 
-// Initialize Gemini client using Vite env var
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
+const PEXELS_API_KEY = import.meta.env.VITE_PEXELS_API_KEY
+
 let genAI = null
+let openai = null
 
 if (!API_KEY) {
   console.warn("[Gemini] Missing VITE_GEMINI_API_KEY in .env. Falling back to mock responses.")
@@ -13,6 +19,19 @@ if (!API_KEY) {
     console.error("[Gemini] Failed to init client:", e)
   }
 }
+
+if (!OPENAI_API_KEY) {
+  console.warn("[OpenAI] Missing VITE_OPENAI_API_KEY in .env. Image generation will fallback to placeholder.")
+  } else {
+    try {
+      openai = new OpenAI({
+        apiKey: OPENAI_API_KEY,
+        dangerouslyAllowBrowser: true
+      })
+    } catch (e) {
+      console.error("[OpenAI] Failed to init client:", e)
+    }
+  }
 
 function extractJson(text) {
   try {
@@ -84,11 +103,56 @@ export async function InvokeLLM({ prompt, response_json_schema }) {
   }
 }
 
-// In src/integrations/Core.js, update the GenerateImage function:
 export async function GenerateImage({ prompt }) {
   console.log("[ImageGen] prompt:", prompt);
-  // Using a more reliable placeholder service
-  return {
-    url: "https://placehold.co/600x800/ff6b9d/ffffff/png?text=Outfit+Image"
-  };
+  // Use Pexels API for image search
+  if (PEXELS_API_KEY) {
+    try {
+      const response = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(prompt)}&per_page=1`, {
+        headers: {
+          Authorization: PEXELS_API_KEY
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.photos && data.photos.length > 0) {
+          const url = data.photos[0].src.medium;
+          return { url };
+        }
+      } else {
+        console.error("[Pexels] API response error:", response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error("[Pexels] Image generation error:", error);
+    }
+  }
+
+  // Fallback to OpenAI image generation if available
+  const fallbackImages = [
+    "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=512&q=80",
+    "https://images.unsplash.com/photo-1521334884684-d80222895322?auto=format&fit=crop&w=512&q=80",
+    "https://images.unsplash.com/photo-1495121605193-b116b5b09a6c?auto=format&fit=crop&w=512&q=80",
+    "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&w=512&q=80"
+  ];
+
+  if (openai) {
+    try {
+      const response = await openai.images.generate({
+        prompt,
+        size: "512x512",
+        n: 1
+      });
+      const url = response.data[0].url;
+      return { url };
+    } catch (error) {
+      console.error("[OpenAI] Image generation error:", error);
+      // Return a random fallback image on error
+      const randomIndex = Math.floor(Math.random() * fallbackImages.length);
+      return { url: fallbackImages[randomIndex] };
+    }
+  }
+
+  // If no OpenAI client, return a random fallback image
+  const randomIndex = Math.floor(Math.random() * fallbackImages.length);
+  return { url: fallbackImages[randomIndex] };
 }
