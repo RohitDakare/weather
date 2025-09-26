@@ -1,105 +1,152 @@
 // import Gemini AI client
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { GoogleGenerativeAI } from "@google/generative-ai";
 // import OpenAI client
-import OpenAI from "openai"
+import OpenAI from "openai";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
-const PEXELS_API_KEY = import.meta.env.VITE_PEXELS_API_KEY
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const PEXELS_API_KEY = import.meta.env.VITE_PEXELS_API_KEY;
 
-let genAI = null
-let openai = null
+let genAI = null;
+let openai = null;
 
+// Fallback outfit data when API is unavailable
+const FALLBACK_OUTFIT = {
+  title: "Stylish Fallback Outfit",
+  description: "A fashionable and comfortable outfit for any occasion",
+  pieces: [
+    { category: "Top", item: "Classic White T-Shirt", color: "White" },
+    { category: "Bottom", item: "Tailored Chinos", color: "Navy Blue" },
+    { category: "Shoes", item: "Leather Sneakers", color: "White" },
+    { category: "Accessories", item: "Minimalist Watch", color: "Silver" }
+  ],
+  style_tags: ["casual", "versatile", "timeless"],
+  why_this_outfit: "This outfit is a reliable choice that works for various occasions and weather conditions."
+};
+
+// Initialize Gemini AI
 if (!API_KEY) {
-  console.warn("[Gemini] Missing VITE_GEMINI_API_KEY in .env. Falling back to mock responses.")
+  console.warn("[Gemini] Missing VITE_GEMINI_API_KEY in .env. Falling back to fallback responses.");
 } else {
   try {
-    genAI = new GoogleGenerativeAI(API_KEY)
+    genAI = new GoogleGenerativeAI(API_KEY);
+    console.log("[Gemini] Client initialized successfully");
   } catch (e) {
-    console.error("[Gemini] Failed to init client:", e)
+    console.error("[Gemini] Failed to init client:", e);
   }
 }
 
+// Initialize OpenAI
 if (!OPENAI_API_KEY) {
-  console.warn("[OpenAI] Missing VITE_OPENAI_API_KEY in .env. Image generation will fallback to placeholder.")
-  } else {
-    try {
-      openai = new OpenAI({
-        apiKey: OPENAI_API_KEY,
-        dangerouslyAllowBrowser: true
-      })
-    } catch (e) {
-      console.error("[OpenAI] Failed to init client:", e)
-    }
+  console.warn("[OpenAI] Missing VITE_OPENAI_API_KEY in .env. Image generation will fallback to placeholder.");
+} else {
+  try {
+    openai = new OpenAI({
+      apiKey: OPENAI_API_KEY,
+      dangerouslyAllowBrowser: true
+    });
+    console.log("[OpenAI] Client initialized successfully");
+  } catch (e) {
+    console.error("[OpenAI] Failed to init client:", e);
   }
+}
 
+// Simple cache to store successful responses
+const responseCache = new Map();
+
+// Function to extract JSON from response text
 function extractJson(text) {
   try {
     // Clean code fences if present
     const cleaned = text
       .replace(/^```(json)?/i, "")
       .replace(/```$/i, "")
-      .trim()
-    return JSON.parse(cleaned)
+      .trim();
+    return JSON.parse(cleaned);
   } catch (e) {
     // Best effort: find first JSON object in text
-    const match = text.match(/\{[\s\S]*\}/)
+    const match = text.match(/\{[\s\S]*\}/);
     if (match) {
-      try { return JSON.parse(match[0]) } catch {}
+      try { 
+        return JSON.parse(match[0]); 
+      } catch (e) {
+        console.error("Failed to parse JSON from response:", e);
+      }
     }
-    throw e
+    throw new Error("Could not extract JSON from response");
   }
 }
 
+// Function to get a cached response if available
+function getCachedResponse(prompt) {
+  const cacheKey = prompt.substring(0, 100); // Use first 100 chars as cache key
+  return responseCache.get(cacheKey);
+}
+
+// Function to cache a successful response
+function cacheResponse(prompt, response) {
+  const cacheKey = prompt.substring(0, 100);
+  responseCache.set(cacheKey, response);
+  return response;
+}
+
 export async function InvokeLLM({ prompt, response_json_schema }) {
-  // If no API key, return a stable mock for dev
+  // If no API key, return fallback
   if (!genAI) {
-    return {
-      title: "Perfect Weather Outfit",
-      description: "A stylish and comfortable outfit perfect for today's weather",
-      pieces: [
-        { category: "Top", item: "Lightweight Blouse", color: "Soft Pink" },
-        { category: "Bottom", item: "High-Waisted Jeans", color: "Medium Blue" },
-        { category: "Shoes", item: "Comfortable Sneakers", color: "White" },
-        { category: "Accessories", item: "Delicate Necklace", color: "Gold" }
-      ],
-      style_tags: ["casual", "comfortable", "weather-appropriate"],
-      why_this_outfit: "This outfit combines comfort with style, perfect for the current weather conditions and your personal preferences."
-    }
+    console.warn("[Gemini] No API key provided. Using fallback outfit.");
+    return FALLBACK_OUTFIT;
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
-
-  const systemInstructions = `You are a fashion stylist. Always respond ONLY with a compact JSON object that matches this TypeScript type (no extra text):\n${JSON.stringify(response_json_schema || {}, null, 2)}\nKeys: title, description, pieces[{category,item,color?}], style_tags[], why_this_outfit.`
-
-  const result = await model.generateContent({
-    contents: [
-      { role: "user", parts: [{ text: systemInstructions + "\n\nUser request:\n" + prompt }] }
-    ],
-    generationConfig: {
-      temperature: 0.8,
-      maxOutputTokens: 512,
-      responseMimeType: "application/json"
-    }
-  })
-
-  const text = result?.response?.text?.() ?? "{}"
   try {
-    const json = extractJson(text)
-    return json
-  } catch (e) {
-    console.warn("[Gemini] Could not parse JSON, returning fallback. Raw:", text)
-    return {
-      title: "Stylish Daily Look",
-      description: "A cohesive look tailored to your preferences and today's weather.",
-      pieces: [
-        { category: "Top", item: "Crewneck Tee", color: "White" },
-        { category: "Bottom", item: "Relaxed Chinos", color: "Khaki" },
-        { category: "Shoes", item: "Minimal Sneakers", color: "White" }
-      ],
-      style_tags: ["minimal", "casual"],
-      why_this_outfit: "Balanced comfort and style for the conditions."
+    // Check cache first
+    const cachedResponse = getCachedResponse(prompt);
+    if (cachedResponse) {
+      console.log("[Gemini] Using cached response");
+      return cachedResponse;
     }
+
+    // If not in cache, make API request
+    console.log("[Gemini] Making API request");
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+    const systemInstructions = `You are a fashion stylist. Always respond ONLY with a compact JSON object that matches this TypeScript type (no extra text):\n${JSON.stringify(response_json_schema || {}, null, 2)}\nKeys: title, description, pieces[{category,item,color?}], style_tags[], why_this_outfit.`;
+
+    const result = await model.generateContent({
+      contents: [
+        { role: "user", parts: [{ text: systemInstructions + "\n\nUser request:\n" + prompt }] }
+      ],
+      generationConfig: {
+        temperature: 0.8,
+        maxOutputTokens: 512,
+        responseMimeType: "application/json"
+      }
+    });
+
+    const response = await result.response;
+    const text = response.text();
+    const jsonResponse = extractJson(text);
+    
+    // Cache the successful response
+    cacheResponse(prompt, jsonResponse);
+    return jsonResponse;
+  } catch (error) {
+    console.error("[Gemini] API Error:", error);
+    
+    // If rate limited, return fallback instead of throwing
+    if (error.message.includes('429') || error.message.includes('quota') || error.message.includes('limit')) {
+      console.warn("[Gemini] Rate limited - Using fallback outfit");
+      return FALLBACK_OUTFIT;
+    }
+    
+    // For other errors, try to use cache if available
+    const cachedResponse = getCachedResponse(prompt);
+    if (cachedResponse) {
+      console.warn("[Gemini] Using cached response after error");
+      return cachedResponse;
+    }
+    
+    // If no cache, return fallback
+    console.warn("[Gemini] No cached response available, using fallback outfit");
+    return FALLBACK_OUTFIT;
   }
 }
 
